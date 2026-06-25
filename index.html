@@ -82,6 +82,10 @@ h1,h2,h3,h4,.font-display { font-family: var(--font-display); font-optical-sizin
   /* Soft, premium elevation on cards */
   main .card { box-shadow: 0 16px 44px -24px rgba(24,42,34,.5), 0 2px 6px -2px rgba(24,42,34,.10); }
 
+  /* Whisper of paper grain — print-like craft */
+  body::after { content:""; position:fixed; inset:0; z-index:40; pointer-events:none; opacity:.022;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+
   /* The 3D stage + its atmospheric glow */
   #record { position: relative; isolation: isolate; }
   #record::before {
@@ -141,12 +145,17 @@ h1,h2,h3,h4,.font-display { font-family: var(--font-display); font-optical-sizin
     <div class="card bg-base-100 border border-base-300/60 rounded-box overflow-hidden">
       <div class="card-body p-0">
 
-        <!-- record header — signer name + binding seal + actions -->
-        <div class="flex items-center gap-3 px-5 sm:px-7 pt-5">
-          <h1 class="font-display text-2xl sm:text-3xl leading-none truncate min-w-0"><span id="signer-name">John Bowen</span></h1>
-          <span id="record-seal" class="badge badge-success badge-soft gap-1 shrink-0">
-            <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Binding
-          </span>
+        <!-- record header — kicker + signer name + binding seal + actions -->
+        <div class="flex items-end gap-3 px-5 sm:px-7 pt-6">
+          <div class="min-w-0">
+            <p class="text-[0.64rem] tracking-[0.24em] uppercase text-base-content/45 font-semibold mb-1.5">Verified voice signature</p>
+            <div class="flex items-center gap-3">
+              <h1 class="font-display text-2xl sm:text-3xl leading-none truncate"><span id="signer-name">John Bowen</span></h1>
+              <span id="record-seal" class="badge badge-success badge-soft gap-1 shrink-0">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Binding
+              </span>
+            </div>
+          </div>
           <div class="ml-auto flex items-center gap-2 shrink-0">
             <button class="btn btn-ghost btn-sm btn-circle" onclick="copyLink()" title="Copy link">
               <i data-lucide="share-2" class="w-4 h-4"></i>
@@ -159,17 +168,17 @@ h1,h2,h3,h4,.font-display { font-family: var(--font-display); font-optical-sizin
 
         <!-- ═══ THE VOICE SIGNATURE · 3D fingerprint with verification fused into the graphic (surfaceless) ═══ -->
         <div class="mt-3">
-          <div id="stage" data-theme="brand-dark"
-               class="relative mx-5 sm:mx-7 rounded-box overflow-hidden ring-1 ring-white/5"
-               style="height: clamp(380px, 56vh, 520px); background: radial-gradient(125% 95% at 50% 6%, #123a32 0%, #0b2326 52%, #07171a 100%);">
+          <div id="stage"
+               class="relative mx-5 sm:mx-7 rounded-box overflow-hidden ring-1 ring-base-content/5"
+               style="height: clamp(380px, 56vh, 520px); background: radial-gradient(135% 110% at 50% -8%, #f7f0df 0%, #ece0c5 55%, #e1d0ad 100%);">
             <canvas id="fp-canvas"></canvas>
             <div id="fp-fallback" class="absolute inset-0 hidden place-items-center">
               <div class="voiceprint h-24" id="fp-fallback-bars" aria-hidden="true"></div>
             </div>
 
             <!-- atmospheric scrims for overlay legibility (light, not a surface) -->
-            <div class="absolute inset-x-0 top-0 h-28 pointer-events-none" style="background:linear-gradient(var(--color-base-100), transparent); opacity:.6"></div>
-            <div class="absolute inset-x-0 bottom-0 h-28 pointer-events-none" style="background:linear-gradient(transparent, var(--color-base-100)); opacity:.6"></div>
+            <div class="absolute inset-x-0 top-0 h-24 pointer-events-none" style="background:linear-gradient(var(--color-base-100), transparent); opacity:.4"></div>
+            <div class="absolute inset-x-0 bottom-0 h-24 pointer-events-none" style="background:linear-gradient(transparent, var(--color-base-100)); opacity:.4"></div>
 
             <!-- match confidence + seal — top-left, floating on the fingerprint -->
             <div class="absolute top-4 left-5 flex items-center gap-3 pointer-events-none">
@@ -638,12 +647,8 @@ function seedAmplitudes() {
 }
 
 function themeColors() {
-  // read from the (dark-themed) stage so the voiceprint uses the glowing dark-mode green/aqua
-  const cs = getComputedStyle(document.getElementById('stage') || document.documentElement);
-  return {
-    primary: new THREE.Color(cs.getPropertyValue('--color-primary').trim() || '#74c45f'),
-    accent:  new THREE.Color(cs.getPropertyValue('--color-accent').trim()  || '#2dd4e6'),
-  };
+  // deep sea-grass green → teal — rich ceramic tones; deeper than the UI green so studio light reads as jade, not mint
+  return { primary: new THREE.Color('#34662c'), accent: new THREE.Color('#1a7d60') };
 }
 
 function init3D() {
@@ -658,6 +663,7 @@ function init3D() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(W, H, false);
   if ('outputEncoding' in renderer) renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(45, W/H, 0.1, 100);
@@ -673,25 +679,32 @@ function init3D() {
   const R = 3.35;
   for (let i=0;i<FP.N;i++) {
     const ang = (i/FP.N) * Math.PI * 2;
-    const col = cols.primary.clone().lerp(cols.accent, FP.amp[i]);
+    const col = cols.primary.clone().lerp(cols.accent, FP.amp[i] * 0.5);  // mostly brand green, green-teal only at the tips
     const mat = new THREE.MeshStandardMaterial({
-      color: col, emissive: col.clone(), emissiveIntensity: 0.6, metalness: 0.35, roughness: 0.35,
+      color: col, emissive: col.clone(), emissiveIntensity: 0.04, metalness: 0.15, roughness: 0.66,
     });
     const bar = new THREE.Mesh(geo, mat);
     bar.position.set(Math.cos(ang)*R, 0, Math.sin(ang)*R);
     bar.scale.y = FP.amp[i] * 2.2;
+    bar.castShadow = true; bar.receiveShadow = true;
     group.add(bar);
     FP.bars.push(bar);
   }
 
-  // Atmospheric platen
-  const grid = new THREE.PolarGridHelper(R+0.5, 16, 6, 64, cols.primary, cols.accent);
-  grid.material.opacity = 0.10; grid.material.transparent = true;
-  scene.add(grid);
+  // Sand floor — invisible plane that only catches the soft contact shadows
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.ShadowMaterial({ opacity: 0.16 }));
+  ground.rotation.x = -Math.PI/2; ground.position.y = 0; ground.receiveShadow = true; scene.add(ground);
 
-  scene.add(new THREE.AmbientLight(0x5a5f8a, 0.7));
-  const p1 = new THREE.PointLight(cols.primary.getHex(), 1.3, 40); p1.position.set(0, 7, 4); scene.add(p1);
-  const p2 = new THREE.PointLight(cols.accent.getHex(), 0.9, 40); p2.position.set(-5, 2, -5); scene.add(p2);
+  // Studio still-life lighting: sea-foam sky / sand bounce, a warm key that casts the shadows, a cool fill
+  scene.add(new THREE.HemisphereLight(0xf3efe6, 0xe7d6b4, 0.72));
+  const key = new THREE.DirectionalLight(0xfff5e4, 1.05);
+  key.position.set(4.5, 9, 5.5); key.castShadow = true;
+  key.shadow.mapSize.set(1024, 1024);
+  key.shadow.camera.near = 1; key.shadow.camera.far = 40;
+  key.shadow.camera.left = -7; key.shadow.camera.right = 7; key.shadow.camera.top = 7; key.shadow.camera.bottom = -7;
+  key.shadow.radius = 7; key.shadow.bias = -0.0006;
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0xdfeef0, 0.35); fill.position.set(-6, 3.5, -4); scene.add(fill);
 
   const controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.target.set(0, 0.9, 0);
@@ -700,10 +713,10 @@ function init3D() {
   controls.enableZoom = true;              // wheel zoom when cursor is over the fingerprint; pinch on touch
   controls.minDistance = 4.5; controls.maxDistance = 11; controls.zoomSpeed = 0.9;
   controls.minPolarAngle = Math.PI*0.22; controls.maxPolarAngle = Math.PI*0.52;
-  controls.autoRotate = !REDUCED; controls.autoRotateSpeed = 0.55;
+  controls.autoRotate = !REDUCED; controls.autoRotateSpeed = 0.32;
   controls.update();
 
-  Object.assign(FP, { renderer, scene, camera, group, controls, clock: new THREE.Clock(), ok:true, p1, p2 });
+  Object.assign(FP, { renderer, scene, camera, group, controls, clock: new THREE.Clock(), ok:true });
 
   window.addEventListener('resize', onResize3D);
   animate3D();
@@ -734,7 +747,7 @@ function animate3D() {
     const bar = FP.bars[i];
     const h = bar.scale.y + (target*2.2 - bar.scale.y) * 0.18;
     bar.scale.y = h;
-    bar.material.emissiveIntensity = 0.45 + Math.min(1.6, (h/2.2)) * (player.playing ? 1.1 : 0.5);
+    bar.material.emissiveIntensity = player.playing ? 0.16 : 0.05;  // matte object, not a glow
   }
   FP.renderer.render(FP.scene, FP.camera);
   requestAnimationFrame(animate3D);
@@ -744,10 +757,9 @@ function recolor3D() {
   if (!FP.ok) return;
   const cols = themeColors();
   FP.bars.forEach((bar,i) => {
-    const col = cols.primary.clone().lerp(cols.accent, FP.amp[i]);
+    const col = cols.primary.clone().lerp(cols.accent, FP.amp[i] * 0.5);  // mostly brand green, green-teal only at the tips
     bar.material.color.copy(col); bar.material.emissive.copy(col);
   });
-  FP.p1.color.set(cols.primary.getHex()); FP.p2.color.set(cols.accent.getHex());
 }
 
 function useFallback() {
