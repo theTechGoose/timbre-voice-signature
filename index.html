@@ -356,56 +356,8 @@ h1,h2,h3,h4,.font-display { font-family: var(--font-display); font-optical-sizin
   </p>
 </main>
 
-<!-- ════════════════════ OVERLAYS (unglamorous states) ════════════════════ -->
-<div id="ov-loading" class="overlay">
-  <div class="text-center px-6">
-    <div class="voiceprint h-16 justify-center mb-6" id="loading-bars" aria-hidden="true"></div>
-    <div class="font-display text-xl">Verifying this record…</div>
-    <p class="text-base-content/55 text-sm mt-1">Confirming the seal and matching the voice fingerprint.</p>
-    <div class="flex flex-col gap-2 mt-6 max-w-xs mx-auto">
-      <div class="skeleton h-3 w-full"></div><div class="skeleton h-3 w-4/5 mx-auto"></div><div class="skeleton h-3 w-2/3 mx-auto"></div>
-    </div>
-  </div>
-</div>
-
-<div id="ov-notfound" class="overlay">
-  <div class="card bg-base-200 border border-base-300/60 rounded-box max-w-md mx-5">
-    <div class="card-body items-center text-center gap-3 p-8">
-      <span class="grid place-items-center w-14 h-14 rounded-box bg-error/15 text-error"><i data-lucide="link-2-off" class="w-7 h-7"></i></span>
-      <h3 class="font-display text-2xl">This link isn’t available</h3>
-      <p class="text-base-content/60">The record may have expired, or the link was mistyped. Guest links stay valid for 30 days after the call.</p>
-      <button class="btn btn-soft mt-2" onclick="toast('A fresh link is on its way to your phone.','info')">
-        <i data-lucide="mail" class="w-4 h-4"></i> Request a new link
-      </button>
-    </div>
-  </div>
-</div>
-
 <!-- Toast region -->
 <div class="toast toast-end z-[70]" id="toast-region"></div>
-
-<!-- ════════════════════ DEMO STATES PANEL (prototype only) ════════════════════ -->
-<div class="fixed bottom-4 right-4 z-50">
-  <div id="demo-panel" class="card bg-base-300/95 backdrop-blur border border-base-content/10 shadow-xl rounded-box w-60 hidden">
-    <div class="card-body p-3 gap-2 text-sm">
-      <div class="flex items-center justify-between">
-        <span class="font-semibold text-xs uppercase tracking-wide text-base-content/55">Prototype states</span>
-        <button class="btn btn-ghost btn-xs btn-circle" onclick="toggleDemo()"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
-      </div>
-      <p class="text-[0.68rem] text-base-content/45 -mt-1">Not part of the guest view.</p>
-      <button class="btn btn-soft btn-sm justify-start gap-2" onclick="showLoading()"><i data-lucide="loader" class="w-4 h-4"></i> Loading splash</button>
-      <button class="btn btn-soft btn-sm justify-start gap-2" onclick="showError()"><i data-lucide="triangle-alert" class="w-4 h-4"></i> Audio error</button>
-      <button class="btn btn-soft btn-sm justify-start gap-2" onclick="showNotFound()"><i data-lucide="link-2-off" class="w-4 h-4"></i> Link not found</button>
-      <button class="btn btn-soft btn-sm justify-start gap-2" onclick="toggleOverflow()"><i data-lucide="text-cursor-input" class="w-4 h-4"></i> Long content</button>
-      <div class="divider my-0"></div>
-      <button class="btn btn-soft btn-sm justify-start gap-2" onclick="toggleTheme()"><i data-lucide="sun-moon" class="w-4 h-4"></i> Toggle light / dark</button>
-      <button class="btn btn-ghost btn-sm justify-start gap-2" onclick="resetView()"><i data-lucide="rotate-ccw" class="w-4 h-4"></i> Reset</button>
-    </div>
-  </div>
-  <button id="demo-fab" class="btn btn-circle btn-primary shadow-xl mt-2 ml-auto block" onclick="toggleDemo()" title="Prototype states">
-    <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
-  </button>
-</div>
 
 <script>
 /* ══════════════════════ HARDCODED DATA ══════════════════════ */
@@ -782,55 +734,6 @@ function toast(msg, kind) {
 }
 function copyLink() { toast('Link copied to your clipboard.', 'success'); }
 function copyHash() { toast('Integrity hash copied.', 'success'); }
-
-function showLoading() {
-  closeDemo();
-  const ov = document.getElementById('ov-loading');
-  ov.querySelector('#loading-bars').innerHTML = Array.from({length:24},(_,i)=>
-    `<span style="height:${30+Math.round(envAt(i/24)*60)}%; animation-delay:${i*55}ms"></span>`).join('');
-  ov.classList.add('show');
-  setTimeout(() => ov.classList.remove('show'), 2400);
-}
-function showError() { closeDemo(); toast('We couldn’t load the recording. Check your connection and retry.', 'error'); }
-function showNotFound() { closeDemo(); document.getElementById('ov-notfound').classList.add('show'); }
-
-let overflowOn = false;
-function toggleOverflow() {
-  overflowOn = !overflowOn;
-  document.getElementById('signer-name').textContent = overflowOn
-    ? 'Jonathan Maximilian Bowen-Featherstonehaugh III'
-    : 'John Bowen';
-  document.getElementById('prop-line').textContent = overflowOn
-    ? 'Peacock Suites at the Anaheim Resort & Convention Gardens — Premium one-bedroom garden-view suite'
-    : 'Peacock Suites · one-bedroom suite';
-  closeDemo();
-  toast(overflowOn ? 'Showing long-content overflow.' : 'Restored default content.', 'info');
-}
-
-function resetView() {
-  document.querySelectorAll('.overlay').forEach(o => o.classList.remove('show'));
-  if (overflowOn) toggleOverflow();
-  player.active=false; player.playing=false; player.progress=0; player.idx=0; cancelAnimationFrame(player.raf); player.last=0;
-  SIG_CLIPS.forEach(c => { if (c.el) { c.el.pause(); c.el.currentTime = 0; } });
-  document.getElementById('sig-ladder').classList.remove('playing');
-  updateClip(); setPlayIcons('play');
-  const seal=document.getElementById('seal-badge'); seal.classList.add('invisible'); seal.classList.remove('seal-reveal');
-  closeDemo(); window.scrollTo({ top:0, behavior: REDUCED?'auto':'smooth' });
-}
-
-function toggleTheme() {
-  const h = document.documentElement;
-  h.dataset.theme = h.dataset.theme === 'brand-dark' ? 'brand' : 'brand-dark';
-  recolor3D();
-}
-
-function toggleDemo() { document.getElementById('demo-panel').classList.toggle('hidden'); }
-function closeDemo() { document.getElementById('demo-panel').classList.add('hidden'); }
-
-// Click-away to dismiss the not-found overlay
-document.getElementById('ov-notfound').addEventListener('click', e => {
-  if (e.target.id === 'ov-notfound') e.currentTarget.classList.remove('show');
-});
 
 /* ══════════════════════ BOOT ══════════════════════ */
 seedAmplitudes();
