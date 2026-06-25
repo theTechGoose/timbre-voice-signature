@@ -1,0 +1,825 @@
+<!doctype html>
+<html lang="en" data-theme="brand-dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Your verbal agreement · Timbre</title>
+
+<!-- ── Brand CDN stack (both required: daisyUI classes + Tailwind utilities) ── -->
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+
+<!-- ── Three.js for the 3D voice fingerprint (UMD globals; r128) ── -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+<!-- ── Timbre design system (theme.cdn.css, pasted inline) ── -->
+<style id="brand-theme">
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Public+Sans:wght@400;500;600;700&display=swap');
+
+[data-theme="brand"] {
+  color-scheme: light;
+  --color-base-100: #f7f8fc; --color-base-200: #eef0f8; --color-base-300: #dcdfee;
+  --color-base-content: #161a2e;
+  --color-primary: #5546e6; --color-primary-content: #ffffff;
+  --color-secondary: #8b7bf7; --color-secondary-content: #181433;
+  --color-accent: #0fa6b8; --color-accent-content: #04282d;
+  --color-neutral: #1e2236; --color-neutral-content: #e9ebf5;
+  --color-info: #3b82f6; --color-info-content: #ffffff;
+  --color-success: #16b981; --color-success-content: #04231a;
+  --color-warning: #e0a106; --color-warning-content: #2a1d00;
+  --color-error: #f43f5e; --color-error-content: #ffffff;
+  --radius-selector: 2rem; --radius-field: 0.5rem; --radius-box: 1rem;
+  --size-selector: 0.25rem; --size-field: 0.25rem; --border: 1px; --depth: 1; --noise: 0;
+}
+[data-theme="brand-dark"] {
+  color-scheme: dark;
+  --color-base-100: #0c0e1a; --color-base-200: #14172a; --color-base-300: #262c49;
+  --color-base-content: #e7e9f6;
+  --color-primary: #8b7bff; --color-primary-content: #0b0a22;
+  --color-secondary: #b9afff; --color-secondary-content: #181433;
+  --color-accent: #2dd4e6; --color-accent-content: #042a30;
+  --color-neutral: #1b1f33; --color-neutral-content: #dfe3f2;
+  --color-info: #5c9dff; --color-info-content: #03122b;
+  --color-success: #34d89e; --color-success-content: #04231a;
+  --color-warning: #f5c84b; --color-warning-content: #2a1d00;
+  --color-error: #fb6f87; --color-error-content: #2a0410;
+  --radius-selector: 2rem; --radius-field: 0.5rem; --radius-box: 1rem;
+  --size-selector: 0.25rem; --size-field: 0.25rem; --border: 1px; --depth: 1; --noise: 0;
+}
+:root {
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-body: 'Public Sans', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  --step--2: 0.64rem; --step--1: 0.8rem; --step-0: 1rem; --step-1: 1.25rem;
+  --step-2: 1.5625rem; --step-3: 1.9531rem; --step-4: 2.4414rem; --step-5: 3.0518rem;
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-standard: cubic-bezier(0.20, 0, 0, 1);
+  --dur-micro: 120ms; --dur-fast: 200ms; --dur-base: 320ms;
+  --color-primary-20: color-mix(in oklch, var(--color-primary) 20%, transparent);
+  --color-primary-40: color-mix(in oklch, var(--color-primary) 40%, transparent);
+  --color-accent-25: color-mix(in oklch, var(--color-accent) 25%, transparent);
+}
+body { font-family: var(--font-body); }
+h1,h2,h3,h4,.font-display { font-family: var(--font-display); font-optical-sizing: auto; letter-spacing: -0.02em; }
+@keyframes brand-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes timbre-listen { 0%,100% { transform: scaleY(0.35); } 50% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) {
+  *,*::before,*::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+</style>
+
+<!-- ── Prototype-local styling (composition + the signature hero) ── -->
+<style>
+  .rise { animation: brand-rise .6s var(--ease-standard) both; }
+  .mono { font-family: var(--font-mono); }
+
+  /* The 3D stage + its atmospheric glow */
+  #record { position: relative; isolation: isolate; }
+  #record::before {
+    content:""; position:absolute; inset:-6% -8% 4% -8%; z-index:-1; pointer-events:none;
+    background:
+      radial-gradient(55% 50% at 50% 28%, var(--color-primary-20), transparent 70%),
+      radial-gradient(45% 45% at 70% 64%, var(--color-accent-25), transparent 72%);
+    filter: blur(12px);
+  }
+  #stage { position: relative; }
+  #fp-canvas { display:block; width:100%; height:100%; cursor: grab; }
+  #fp-canvas:active { cursor: grabbing; }
+  .stage-hint { position:absolute; left:50%; bottom:14px; transform:translateX(-50%);
+    font-size:.7rem; letter-spacing:.04em; color:var(--color-base-content);
+    opacity:.45; pointer-events:none; }
+
+
+  /* CSS voiceprint fallback (if Three.js is blocked) + the mini live strip */
+  .voiceprint { display:flex; align-items:flex-end; gap:3px; }
+  .voiceprint span { width:4px; border-radius:2px; transform-origin:bottom;
+    background:linear-gradient(var(--color-primary), var(--color-accent));
+    animation: timbre-listen 1.1s var(--ease-standard) infinite; }
+
+  /* Signature ladder (replaces the player scrubber) — steps grow on play */
+  #sig-ladder { transition: transform .3s var(--ease-bounce); transform-origin: left center; }
+  #sig-ladder.playing { transform: scale(1.06); }
+  #sig-ladder .step { transition: color .2s var(--ease-standard); }
+  #sig-ladder .step.cur { font-weight: 700; }
+  #sig-ladder .step.cur::after {
+    outline: 2px solid var(--color-accent); outline-offset: 2px;
+    box-shadow: 0 0 0 4px var(--color-accent-25); }
+
+  /* The sealed badge reveal */
+  @keyframes seal-pop { 0% { opacity:0; transform: scale(.55); } 100% { opacity:1; transform: scale(1); } }
+  .seal-reveal { animation: seal-pop .5s var(--ease-bounce) both; }
+
+  /* Transcript */
+  .tline { scroll-margin-top: 90px; }
+  .tline.sig { background: var(--color-primary-20); border-radius: var(--radius-field); }
+  .tline.active { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: var(--radius-field); }
+  .scroller { scrollbar-width: thin; scrollbar-color: var(--color-base-300) transparent; }
+  .scroller::-webkit-scrollbar { width: 8px; }
+  .scroller::-webkit-scrollbar-thumb { background: var(--color-base-300); border-radius: 8px; }
+
+  .overlay { position: fixed; inset: 0; z-index: 60; display:none; place-items:center;
+    background: color-mix(in oklch, var(--color-base-100) 88%, transparent); backdrop-filter: blur(6px); }
+  .overlay.show { display:grid; }
+</style>
+</head>
+
+<body class="min-h-screen bg-base-100 text-base-content">
+
+<main class="max-w-5xl mx-auto px-5 pb-24">
+
+  <!-- ═══════ THE SIGNATURE RECORD · credential (identity + verification) → voice signature (fingerprint + player) ═══════ -->
+  <section id="record" class="pt-7 sm:pt-10 rise">
+    <div class="card bg-base-200/40 border border-base-300/60 rounded-box overflow-hidden">
+      <div class="card-body p-0">
+
+        <!-- record header — signer name + binding seal + actions -->
+        <div class="flex items-center gap-3 px-5 sm:px-7 pt-5">
+          <h1 class="font-display text-2xl sm:text-3xl leading-none truncate min-w-0"><span id="signer-name">John Bowen</span></h1>
+          <span id="record-seal" class="badge badge-success badge-soft gap-1 shrink-0">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Binding
+          </span>
+          <div class="ml-auto flex items-center gap-2 shrink-0">
+            <button class="btn btn-ghost btn-sm btn-circle" onclick="copyLink()" title="Copy link">
+              <i data-lucide="share-2" class="w-4 h-4"></i>
+            </button>
+            <button class="btn btn-soft btn-sm gap-1.5" onclick="toast('Preparing your PDF copy…','info')">
+              <i data-lucide="download" class="w-4 h-4"></i><span class="hidden sm:inline">Save copy</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ═══ THE VOICE SIGNATURE · 3D fingerprint with verification fused into the graphic (surfaceless) ═══ -->
+        <div class="mt-3">
+          <div id="stage" class="relative" style="height: clamp(420px, 60vh, 560px);">
+            <canvas id="fp-canvas"></canvas>
+            <div id="fp-fallback" class="absolute inset-0 hidden place-items-center">
+              <div class="voiceprint h-24" id="fp-fallback-bars" aria-hidden="true"></div>
+            </div>
+
+            <!-- atmospheric scrims for overlay legibility (light, not a surface) -->
+            <div class="absolute inset-x-0 top-0 h-28 pointer-events-none" style="background:linear-gradient(var(--color-base-100), transparent); opacity:.6"></div>
+            <div class="absolute inset-x-0 bottom-0 h-28 pointer-events-none" style="background:linear-gradient(transparent, var(--color-base-100)); opacity:.6"></div>
+
+            <!-- match confidence + seal — top-left, floating on the fingerprint -->
+            <div class="absolute top-4 left-5 flex items-center gap-3 pointer-events-none">
+              <div class="radial-progress text-primary" style="--value:98.7; --size:4.2rem; --thickness:5px;" role="progressbar">
+                <span class="font-display text-sm">98.7%</span>
+              </div>
+              <div>
+                <div class="font-display flex items-center gap-1.5"><i data-lucide="shield-check" class="w-4 h-4 text-success"></i> Verified &amp; sealed</div>
+                <div class="text-xs text-success">Voice match above 95%</div>
+                <div class="text-[0.68rem] text-base-content/50">Monster Reservations Group</div>
+              </div>
+            </div>
+
+            <!-- record metadata — top-right, floating -->
+            <div class="absolute top-4 right-5 text-right text-xs text-base-content/55 leading-relaxed hidden sm:block pointer-events-none">
+              <div class="mono text-base-content/80">TMB-BOWEN-0714-26</div>
+              <div>Recorded Jun 14, 2026 · 3:42 PM</div>
+              <div>Sealed Jun 14, 2026 · 3:46 PM · <span class="mono">3:55</span></div>
+            </div>
+
+            <!-- integrity hash — bottom-left, surfaceless -->
+            <button class="absolute bottom-4 left-5 mono text-[0.68rem] text-base-content/45 hover:text-accent transition flex items-center gap-1.5 max-w-[55%]"
+                    onclick="copyHash()" title="Copy integrity hash">
+              <i data-lucide="lock" class="w-3 h-3 shrink-0"></i>
+              <span class="truncate"><span id="hash">f3a9c1e87b4d0a26e5f1c93ad7402b8e9c6f15a0d83b7e21c40f9a6db5e8c7f4e</span></span>
+            </button>
+
+            <div class="stage-hint" style="left:auto; right:1.25rem; transform:none;"><i data-lucide="move-3d" class="w-3.5 h-3.5 inline-block align-[-3px]"></i> drag</div>
+          </div>
+
+          <!-- the spoken-signature player — continuous with the graphic -->
+          <div class="px-5 sm:px-7 pb-6 -mt-1 flex flex-col gap-4">
+            <div class="flex items-center gap-4">
+              <button id="play-btn" onclick="togglePlay()"
+                class="btn btn-primary btn-circle btn-lg shrink-0" aria-label="Play or pause the signature clip">
+                <i data-lucide="play" class="w-6 h-6 translate-x-0.5"></i>
+              </button>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center justify-between gap-3">
+                  <div class="font-display text-lg">The spoken signature</div>
+                  <div class="mono text-sm text-base-content/55"><span id="cur-time">03:05</span> / 03:18</div>
+                </div>
+                <ul id="sig-ladder" class="steps steps-horizontal w-full mt-2 text-xs" aria-label="Verification progress">
+                  <li class="step step-success" data-step="0" data-content="✓">Identity</li>
+                  <li class="step step-success" data-step="1" data-content="✓">Terms</li>
+                  <li class="step step-success" data-step="2" data-content="✓">Name</li>
+                  <li class="step step-success" data-step="3" data-content="✓">Sealed</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- The exchange, smaller, under the ladder (corrected product wording) -->
+            <div class="grid gap-1.5" id="sig-lines">
+              <div class="flex gap-2.5 items-start opacity-60 transition" data-sig="0">
+                <span class="badge badge-ghost badge-xs shrink-0 mt-0.5">Alexa</span>
+                <p class="text-base-content/70 text-xs sm:text-sm">“And for your signature on the verbal agreement, please state your name.”</p>
+              </div>
+              <div class="flex gap-2.5 items-start opacity-60 transition" data-sig="1">
+                <span class="badge badge-accent badge-soft badge-xs shrink-0 mt-0.5">You</span>
+                <p class="font-display text-base text-base-content">“John Bowen.”</p>
+              </div>
+              <div class="flex gap-2.5 items-start opacity-60 transition" data-sig="2">
+                <span class="badge badge-ghost badge-xs shrink-0 mt-0.5">Alexa</span>
+                <p class="text-base-content/70 text-xs sm:text-sm">“Thank you, John. Your <span class="text-accent">voice fingerprint</span> and name have been recorded as your signature on this agreement.”</p>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <span id="seal-badge" class="badge badge-success gap-1.5 invisible">
+                <i data-lucide="badge-check" class="w-4 h-4"></i> Signature sealed
+              </span>
+              <span class="text-xs text-base-content/45 flex items-center gap-1.5">
+                <i data-lucide="lock" class="w-3.5 h-3.5"></i> Tamper-evident · any edit to the audio breaks the seal
+              </span>
+            </div>
+          </div>
+
+          <p class="text-xs text-base-content/45 px-5 sm:px-7 pb-6 pt-4 border-t border-base-300/50">
+            This page is a guest copy of a verbal agreement captured by phone. The voice fingerprint is a
+            one-way acoustic signature derived from the recording; it cannot be used to reconstruct your voice.
+            Questions about this record? Reply to the text or email you received, or call Monster Reservations Group.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════ WHAT WAS AGREED ════════════════════ -->
+  <section class="mt-12 rise">
+    <h2 class="font-display text-2xl mb-1">What you agreed to</h2>
+    <p class="text-base-content/60 text-sm mb-5">The reservation terms confirmed during the call.</p>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="card bg-base-200/50 border border-base-300/60 rounded-box"><div class="card-body p-5 gap-1">
+        <div class="flex items-center gap-2 text-base-content/55 text-sm"><i data-lucide="map-pin" class="w-4 h-4 text-accent"></i> Destination</div>
+        <div class="font-display text-xl">Anaheim, California</div>
+        <div class="text-base-content/60 text-sm" id="prop-line">Peacock Suites · one-bedroom suite</div>
+      </div></div>
+
+      <div class="card bg-base-200/50 border border-base-300/60 rounded-box"><div class="card-body p-5 gap-1">
+        <div class="flex items-center gap-2 text-base-content/55 text-sm"><i data-lucide="calendar-range" class="w-4 h-4 text-accent"></i> Stay</div>
+        <div class="font-display text-xl">Jul 14 – 18, 2026</div>
+        <div class="text-base-content/60 text-sm">Tue arrival → Sat departure · 4 nights</div>
+      </div></div>
+
+      <div class="card bg-base-200/50 border border-base-300/60 rounded-box"><div class="card-body p-5 gap-1">
+        <div class="flex items-center gap-2 text-base-content/55 text-sm"><i data-lucide="users" class="w-4 h-4 text-accent"></i> Party</div>
+        <div class="font-display text-xl">Up to 4 guests</div>
+        <div class="text-base-content/60 text-sm">Primary traveler · married</div>
+      </div></div>
+
+      <div class="card bg-base-200/50 border border-base-300/60 rounded-box"><div class="card-body p-5 gap-1">
+        <div class="flex items-center gap-2 text-base-content/55 text-sm"><i data-lucide="credit-card" class="w-4 h-4 text-accent"></i> Hotel taxes collected</div>
+        <div class="font-display text-xl">$138.38</div>
+        <div class="text-base-content/60 text-sm">Authorized to card on file</div>
+      </div></div>
+
+      <div class="card bg-base-200/50 border border-base-300/60 rounded-box"><div class="card-body p-5 gap-1">
+        <div class="flex items-center gap-2 text-base-content/55 text-sm"><i data-lucide="presentation" class="w-4 h-4 text-accent"></i> Included session</div>
+        <div class="font-display text-xl">120-min Wyndham preview</div>
+        <div class="text-base-content/60 text-sm">$150 refundable deposit afterward</div>
+      </div></div>
+
+      <div class="card bg-base-200/50 border border-base-300/60 rounded-box"><div class="card-body p-5 gap-1">
+        <div class="flex items-center gap-2 text-base-content/55 text-sm"><i data-lucide="calendar-x" class="w-4 h-4 text-warning"></i> Free cancellation until</div>
+        <div class="font-display text-xl">Thu, Jul 9 · 3:00 PM</div>
+        <div class="text-base-content/60 text-sm">No-show fee after: $700</div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ════════════════════ THE LEDGER (confirmed clauses) ════════════════════ -->
+  <section class="mt-12 rise">
+    <div class="flex items-end justify-between gap-3 flex-wrap mb-5">
+      <div>
+        <h2 class="font-display text-2xl mb-1">Confirmed on the record</h2>
+        <p class="text-base-content/60 text-sm">Every term you acknowledged out loud. Tap any line to hear that moment.</p>
+      </div>
+      <span class="badge badge-soft badge-success gap-1.5"><i data-lucide="list-checks" class="w-4 h-4"></i> <span id="clause-count">13</span> confirmed</span>
+    </div>
+
+    <div class="card bg-base-200/40 border border-base-300/60 rounded-box overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="table">
+          <thead><tr class="text-base-content/55">
+            <th>Clause</th><th class="whitespace-nowrap">Confirmed at</th><th>Response</th><th class="text-right">Status</th>
+          </tr></thead>
+          <tbody id="clause-rows"><!-- rendered --></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════ FULL TRANSCRIPT ════════════════════ -->
+  <section class="mt-12 rise">
+    <div class="flex items-center justify-between gap-3 flex-wrap mb-5">
+      <div>
+        <h2 class="font-display text-2xl mb-1">Full transcript</h2>
+        <p class="text-base-content/60 text-sm">The complete call — <span class="mono">3:55</span> · recorded for quality assurance.</p>
+      </div>
+      <div class="flex items-center gap-2 text-sm">
+        <span class="flex items-center gap-1.5 text-base-content/55"><span class="w-2.5 h-2.5 rounded-full bg-base-content/40"></span> Alexa · agent</span>
+        <span class="flex items-center gap-1.5 text-base-content/55"><span class="w-2.5 h-2.5 rounded-full bg-accent"></span> You</span>
+      </div>
+    </div>
+
+    <div class="card bg-base-200/40 border border-base-300/60 rounded-box">
+      <div class="card-body p-3 sm:p-4">
+        <div id="transcript" class="scroller grid gap-1 max-h-[460px] overflow-y-auto pr-1"><!-- rendered --></div>
+      </div>
+    </div>
+  </section>
+
+  <p class="text-center text-xs text-base-content/35 mt-12 flex items-center justify-center gap-1.5">
+    <i data-lucide="lock" class="w-3.5 h-3.5"></i> Verified verbal agreement · Monster Reservations Group
+  </p>
+</main>
+
+<!-- ════════════════════ OVERLAYS (unglamorous states) ════════════════════ -->
+<div id="ov-loading" class="overlay">
+  <div class="text-center px-6">
+    <div class="voiceprint h-16 justify-center mb-6" id="loading-bars" aria-hidden="true"></div>
+    <div class="font-display text-xl">Verifying this record…</div>
+    <p class="text-base-content/55 text-sm mt-1">Confirming the seal and matching the voice fingerprint.</p>
+    <div class="flex flex-col gap-2 mt-6 max-w-xs mx-auto">
+      <div class="skeleton h-3 w-full"></div><div class="skeleton h-3 w-4/5 mx-auto"></div><div class="skeleton h-3 w-2/3 mx-auto"></div>
+    </div>
+  </div>
+</div>
+
+<div id="ov-notfound" class="overlay">
+  <div class="card bg-base-200 border border-base-300/60 rounded-box max-w-md mx-5">
+    <div class="card-body items-center text-center gap-3 p-8">
+      <span class="grid place-items-center w-14 h-14 rounded-box bg-error/15 text-error"><i data-lucide="link-2-off" class="w-7 h-7"></i></span>
+      <h3 class="font-display text-2xl">This link isn’t available</h3>
+      <p class="text-base-content/60">The record may have expired, or the link was mistyped. Guest links stay valid for 30 days after the call.</p>
+      <button class="btn btn-soft mt-2" onclick="toast('A fresh link is on its way to your phone.','info')">
+        <i data-lucide="mail" class="w-4 h-4"></i> Request a new link
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast region -->
+<div class="toast toast-end z-[70]" id="toast-region"></div>
+
+<!-- ════════════════════ DEMO STATES PANEL (prototype only) ════════════════════ -->
+<div class="fixed bottom-4 right-4 z-50">
+  <div id="demo-panel" class="card bg-base-300/95 backdrop-blur border border-base-content/10 shadow-xl rounded-box w-60 hidden">
+    <div class="card-body p-3 gap-2 text-sm">
+      <div class="flex items-center justify-between">
+        <span class="font-semibold text-xs uppercase tracking-wide text-base-content/55">Prototype states</span>
+        <button class="btn btn-ghost btn-xs btn-circle" onclick="toggleDemo()"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+      </div>
+      <p class="text-[0.68rem] text-base-content/45 -mt-1">Not part of the guest view.</p>
+      <button class="btn btn-soft btn-sm justify-start gap-2" onclick="showLoading()"><i data-lucide="loader" class="w-4 h-4"></i> Loading splash</button>
+      <button class="btn btn-soft btn-sm justify-start gap-2" onclick="showError()"><i data-lucide="triangle-alert" class="w-4 h-4"></i> Audio error</button>
+      <button class="btn btn-soft btn-sm justify-start gap-2" onclick="showNotFound()"><i data-lucide="link-2-off" class="w-4 h-4"></i> Link not found</button>
+      <button class="btn btn-soft btn-sm justify-start gap-2" onclick="toggleOverflow()"><i data-lucide="text-cursor-input" class="w-4 h-4"></i> Long content</button>
+      <div class="divider my-0"></div>
+      <button class="btn btn-soft btn-sm justify-start gap-2" onclick="toggleTheme()"><i data-lucide="sun-moon" class="w-4 h-4"></i> Toggle light / dark</button>
+      <button class="btn btn-ghost btn-sm justify-start gap-2" onclick="resetView()"><i data-lucide="rotate-ccw" class="w-4 h-4"></i> Reset</button>
+    </div>
+  </div>
+  <button id="demo-fab" class="btn btn-circle btn-primary shadow-xl mt-2 ml-auto block" onclick="toggleDemo()" title="Prototype states">
+    <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+  </button>
+</div>
+
+<script>
+/* ══════════════════════ HARDCODED DATA ══════════════════════ */
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Confirmed-clause ledger → each links to a transcript line index
+const CLAUSES = [
+  { c:"Reservation: Anaheim · Jul 14–18 · Peacock Suites", t:"01:13", a:"“Yeah”", idx:10 },
+  { c:"Party size is four or fewer", t:"01:20", a:"“Yes”", idx:12 },
+  { c:"Valid government IDs with matching addresses", t:"01:33", a:"“Yes”", idx:14 },
+  { c:"Second form of ID — a major credit card", t:"01:41", a:"“Yes”", idx:16 },
+  { c:"Marital status: married", t:"01:46", a:"“Yes”", idx:18 },
+  { c:"Speaks & understands English fluently", t:"01:52", a:"“Yes”", idx:20 },
+  { c:"Current age is 56", t:"01:57", a:"“Yes”", idx:22 },
+  { c:"Annual income at least $150,000", t:"02:05", a:"“Yes”", idx:24 },
+  { c:"Bankruptcy-free for the past two years", t:"02:10", a:"“Yeah”", idx:26 },
+  { c:"120-min Wyndham preview · $150 refundable deposit", t:"02:32", a:"“Yes”", idx:28 },
+  { c:"Nothing would prevent making the trip", t:"02:37", a:"“No”", idx:30, neg:true },
+  { c:"Cancellation terms & $700 no-show fee acknowledged", t:"03:04", a:"“Yes”", idx:32 },
+  { c:"Authorize $138.38 hotel-tax charge", t:"03:31", a:"“Yes”", idx:36 },
+];
+
+// Full transcript (utterance-level, from demo_call.json). who: 'you' = John, 'agent' = Alexa.
+const TRANSCRIPT = [
+  {t:"00:00",who:"you",  x:"Hello."},
+  {t:"00:01",who:"agent",x:"Hi, I'm Alexa with Monster Reservations Group. I'm calling about the Bowen family's Anaheim trip on July 14th and it's almost ready. Are you excited yet?"},
+  {t:"00:11",who:"you",  x:"Yeah."},
+  {t:"00:12",who:"agent",x:"That's great to hear. It sounds like you're really looking forward to soaking up the Anaheim sunshine. What are you most looking forward to doing while you're there?"},
+  {t:"00:21",who:"you",  x:"I'm just relaxing."},
+  {t:"00:22",who:"agent",x:"Oh, nice. A little downtime. Sounds perfect. While I have you, I'd love to confirm your reservation details. It'll take about two minutes. Is now a good time?"},
+  {t:"00:33",who:"you",  x:"Yes, two minutes."},
+  {t:"00:35",who:"agent",x:"Awesome. Just so you know, this call is being recorded for quality assurance and training purposes. This call will go very smoothly. If you could answer my questions only with a yes or a no, because that is what we need for the system to log your answers. Does that make sense?"},
+  {t:"00:51",who:"you",  x:"Yes."},
+  {t:"00:53",who:"agent",x:"Thank you. It will also help if you can reduce any background noise. Let's get started. I have you traveling to Anaheim, arriving on Tuesday, July 14, 2026 and departing on Saturday, July 18, 2026, with a reservation for a one-bedroom unit at Peacock Suites. Does that sound right?"},
+  {t:"01:13",who:"you",  x:"Yeah."},
+  {t:"01:14",who:"agent",x:"Wonderful. Could you confirm that the number of people in your group is less than or equal to four?"},
+  {t:"01:20",who:"you",  x:"Yes."},
+  {t:"01:21",who:"agent",x:"Do you and your spouse have valid driver's licenses or government-issued IDs with matching addresses on them? That means the address on both IDs must be the same and valid at the time of travel."},
+  {t:"01:33",who:"you",  x:"Yes."},
+  {t:"01:34",who:"agent",x:"Excellent. You will need a second form of ID. Can you please bring a major credit card with you when you travel?"},
+  {t:"01:41",who:"you",  x:"Yes."},
+  {t:"01:42",who:"agent",x:"Got it. And I have you here as married. Is that still correct?"},
+  {t:"01:46",who:"you",  x:"Yes."},
+  {t:"01:47",who:"agent",x:"Great. Can you confirm that you speak and understand English fluently?"},
+  {t:"01:52",who:"you",  x:"Yes."},
+  {t:"01:53",who:"agent",x:"Okay. Now I have your current age as 56. Is this correct?"},
+  {t:"01:57",who:"you",  x:"Yes."},
+  {t:"01:58",who:"agent",x:"Got it. Can you confirm if your income is still at least $150,000 a year?"},
+  {t:"02:05",who:"you",  x:"Yes."},
+  {t:"02:06",who:"agent",x:"Got it. Now, have you been bankruptcy-free for the past two years?"},
+  {t:"02:10",who:"you",  x:"Yeah."},
+  {t:"02:11",who:"agent",x:"Perfect. Just a quick reminder. You are scheduled for a 120-minute timeshare presentation with Wyndham. There's absolutely no pressure to buy anything. We simply hope you'll enjoy the experience with an open mind. After the presentation, you'll receive your $150 refundable deposit. Does that sound fair to you?"},
+  {t:"02:32",who:"you",  x:"Yes."},
+  {t:"02:33",who:"agent",x:"Is there anything that might keep you from making the trip?"},
+  {t:"02:37",who:"you",  x:"No."},
+  {t:"02:38",who:"agent",x:"Great. The only reason we mention this is because the no-show fee on this trip is currently $700. At Monster, our goal is for you to have the most pleasant experience possible, so we want to make sure you're not getting hit with any unexpected fees. If for any reason you need to cancel, I can offer that up to five days before your trip. In your case, that would be Thursday, July 9th at 3pm EST. Does that all make sense?"},
+  {t:"03:04",who:"you",  x:"Yes."},
+  {t:"03:05",who:"agent",x:"Wonderful. And for your signature on the verbal agreement, please state your name.", sig:true},
+  {t:"03:10",who:"you",  x:"John Bowen.", sig:true},
+  {t:"03:12",who:"agent",x:"Thank you, John. Your voice fingerprint and name have been recorded as your signature on this agreement. Now, to finalize your reservation and guarantee your room, I need to collect the hotel taxes. The total comes to $138.38. Am I clear to charge your card on file for this amount?", sig:true},
+  {t:"03:31",who:"you",  x:"Yes."},
+  {t:"03:32",who:"agent",x:"Perfect. You'll receive your full check-in details via text and email shortly, which will include everything you need. This is your last opportunity to add white-glove service protection before your trip. For $187.59, you get complete flexibility if life happens — otherwise, your dates are confirmed and you're all set to go. Have a great day."},
+];
+
+/* ══════════════════════ RENDER: LEDGER + TRANSCRIPT ══════════════════════ */
+function renderClauses() {
+  document.getElementById('clause-rows').innerHTML = CLAUSES.map(c => `
+    <tr class="hover:bg-base-100/40 cursor-pointer transition" onclick="jumpTo(${c.idx})">
+      <td class="font-medium">${c.c}</td>
+      <td class="mono text-base-content/60 whitespace-nowrap">${c.t}</td>
+      <td class="${c.neg ? 'text-base-content/70' : 'text-base-content/70'}">${c.a}</td>
+      <td class="text-right">
+        <span class="badge badge-success badge-soft gap-1"><i data-lucide="check" class="w-3 h-3"></i> Confirmed</span>
+      </td>
+    </tr>`).join('');
+  document.getElementById('clause-count').textContent = CLAUSES.length;
+}
+
+function renderTranscript() {
+  document.getElementById('transcript').innerHTML = TRANSCRIPT.map((u,i) => {
+    const you = u.who === 'you';
+    return `
+    <div id="t-${i}" class="tline ${u.sig ? 'sig' : ''} flex gap-3 items-start p-2.5 rounded-field hover:bg-base-100/40 transition">
+      <span class="mono text-xs text-base-content/40 w-10 shrink-0 pt-0.5">${u.t}</span>
+      <span class="badge badge-sm shrink-0 mt-0.5 ${you ? 'badge-accent badge-soft' : 'badge-ghost'}">${you ? 'You' : 'Alexa'}</span>
+      <p class="${you ? 'text-base-content font-medium' : 'text-base-content/75'} leading-relaxed">${u.x}${u.sig && you ? ' <span class="badge badge-success badge-xs align-middle ml-1">signature</span>' : ''}</p>
+    </div>`;
+  }).join('');
+}
+
+function jumpTo(idx) {
+  const el = document.getElementById('t-'+idx);
+  if (!el) return;
+  el.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'center' });
+  document.querySelectorAll('.tline.active').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  setTimeout(() => el.classList.remove('active'), 2200);
+}
+
+/* ══════════════════════ FAKE CLIP PLAYBACK ══════════════════════ */
+// Synthetic amplitude envelope for the ~13s signature clip (no real audio → always works on double-click).
+function envAt(p) {
+  const g = (x,c,w) => Math.exp(-((x-c)*(x-c))/(2*w*w));
+  let v = 0.16;
+  v += 0.30*g(p,0.18,0.10);   // agent prompt swell
+  v += 0.95*g(p,0.435,0.022); // "John"
+  v += 0.85*g(p,0.470,0.020); // "Bowen"
+  v += 0.45*g(p,0.620,0.055); // "Thank you, John"
+  v += 0.40*g(p,0.800,0.110); // confirmation
+  v += 0.05*Math.sin(p*60);   // shimmer
+  return Math.max(0.05, Math.min(1, v));
+}
+
+// The signature recording, segmented to the three spoken lines. Bundled next to this file so it plays
+// over annotate AND on a double-click; in production these become S3 URLs (no other change needed).
+const SIG_CLIPS = [
+  { src:'sig-1-prompt.mp3',  sig:0, step:1 },  // Alexa: "…please state your name."
+  { src:'sig-2-name.mp3',    sig:1, step:2 },  // You:   "John Bowen."
+  { src:'sig-3-confirm.mp3', sig:2, step:3 },  // Alexa: "…recorded as your signature…"
+];
+// mode 'audio' plays the real clips; falls back to 'synth' (envelope timer) if they can't load.
+const player = { active:false, playing:false, progress:0, raf:null, last:0, CLIP:13.0, mode:'audio', idx:0 };
+
+function initAudio() {
+  SIG_CLIPS.forEach(c => {
+    const a = new Audio(); a.preload = 'auto'; a.src = c.src;
+    a.addEventListener('error', () => { player.mode = 'synth'; });
+    c.el = a;
+  });
+}
+
+function fmtClip(p) {
+  const sec = 185 + p * 13;            // 03:05 → 03:18
+  const m = Math.floor(sec/60), s = Math.floor(sec%60);
+  return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+
+function updateClip() {
+  const p = player.progress;
+  document.getElementById('cur-time').textContent = fmtClip(p);
+  // three even phases (audio progress = (clipIdx + frac)/3): Terms → Name → Sealed
+  const phase = p < 1/3 ? 0 : (p < 2/3 ? 1 : 2);
+  const step = phase + 1;
+  document.querySelectorAll('#sig-ladder .step').forEach(s =>
+    s.classList.toggle('cur', player.active && (+s.dataset.step) === step));
+  document.querySelectorAll('#sig-lines [data-sig]').forEach(n => {
+    const on = (+n.dataset.sig) === phase && player.active;
+    n.style.opacity = on ? '1' : (player.active ? '0.45' : '0.6');
+    n.style.transform = on ? 'translateX(3px)' : 'none';
+  });
+}
+
+function tickClip(ts) { // synth fallback — no real audio
+  if (!player.playing) return;
+  if (!player.last) player.last = ts;
+  const dt = (ts - player.last) / 1000; player.last = ts;
+  player.progress += dt / player.CLIP;
+  if (player.progress >= 1) { player.progress = 1; updateClip(); endClip(); return; }
+  updateClip();
+  player.raf = requestAnimationFrame(tickClip);
+}
+
+function setPlayIcons(name) {
+  document.querySelectorAll('#play-btn i').forEach(i => i.setAttribute('data-lucide', name));
+  lucide.createIcons();
+}
+
+function playClip(idx) {        // play the real audio segments in sequence
+  player.idx = idx;
+  const a = SIG_CLIPS[idx].el;
+  a.currentTime = 0;
+  a.ontimeupdate = () => {
+    const frac = (a.duration && isFinite(a.duration)) ? Math.min(a.currentTime / a.duration, 1) : 0;
+    player.progress = (idx + frac) / SIG_CLIPS.length;
+    updateClip();
+  };
+  a.onended = () => {
+    if (!player.playing) return;
+    if (idx + 1 < SIG_CLIPS.length) playClip(idx + 1);
+    else { player.progress = 1; updateClip(); endClip(); }
+  };
+  a.play().catch(fallbackToSynth);
+}
+
+function fallbackToSynth() {
+  player.mode = 'synth';
+  SIG_CLIPS.forEach(c => c.el && c.el.pause());
+  if (player.playing) { player.last = 0; player.raf = requestAnimationFrame(tickClip); }
+}
+
+function togglePlay() {
+  const ladder = document.getElementById('sig-ladder');
+  if (player.playing) { // pause
+    player.playing = false; setPlayIcons('play'); ladder.classList.remove('playing');
+    cancelAnimationFrame(player.raf); player.last = 0;
+    if (player.mode === 'audio' && SIG_CLIPS[player.idx].el) SIG_CLIPS[player.idx].el.pause();
+    return;
+  }
+  player.active = true; player.playing = true;
+  setPlayIcons('pause'); ladder.classList.add('playing');
+  if (player.mode === 'synth') {
+    if (player.progress >= 1) player.progress = 0;
+    player.last = 0; player.raf = requestAnimationFrame(tickClip);
+    return;
+  }
+  const a = SIG_CLIPS[player.idx].el;          // audio: start fresh, or resume mid-clip
+  if (player.progress >= 1 || player.progress <= 0 || !a || a.ended) playClip(0);
+  else a.play().catch(fallbackToSynth);
+}
+
+function endClip() {
+  player.playing = false; cancelAnimationFrame(player.raf); player.last = 0;
+  setPlayIcons('play');
+  document.getElementById('sig-ladder').classList.remove('playing');
+  // Reveal the seal with the brand bounce
+  const seal = document.getElementById('seal-badge');
+  seal.classList.remove('invisible'); seal.classList.add('seal-reveal');
+  toast('Signature sealed — this agreement is binding.', 'success');
+}
+
+/* ══════════════════════ 3D VOICE FINGERPRINT ══════════════════════ */
+const FP = { N:128, bars:[], amp:[], group:null, renderer:null, scene:null, camera:null, controls:null, clock:null, ok:false };
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;};}
+
+function seedAmplitudes() {
+  const rnd = mulberry32(0x7A11B0E); // fixed seed → "John's" stable fingerprint
+  for (let i=0;i<FP.N;i++) {
+    const a = i/FP.N;
+    let v = 0.12
+      + 0.50*Math.exp(-Math.pow((a-0.20)/0.075,2))
+      + 0.42*Math.exp(-Math.pow((a-0.55)/0.130,2))
+      + 0.30*Math.exp(-Math.pow((a-0.82)/0.060,2));
+    v *= (0.6 + 0.8*rnd());
+    FP.amp.push(Math.max(0.07, Math.min(1, v)));
+  }
+}
+
+function themeColors() {
+  const cs = getComputedStyle(document.documentElement);
+  return {
+    primary: new THREE.Color(cs.getPropertyValue('--color-primary').trim() || '#8b7bff'),
+    accent:  new THREE.Color(cs.getPropertyValue('--color-accent').trim()  || '#2dd4e6'),
+  };
+}
+
+function init3D() {
+  if (typeof THREE === 'undefined') { useFallback(); return; }
+  const canvas = document.getElementById('fp-canvas');
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+  } catch (e) { useFallback(); return; }
+  const wrap = canvas.parentElement;
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(W, H, false);
+  if ('outputEncoding' in renderer) renderer.outputEncoding = THREE.sRGBEncoding;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, W/H, 0.1, 100);
+  camera.position.set(0, 3.4, 7.4);
+
+  const group = new THREE.Group();
+  scene.add(group);
+
+  const cols = themeColors();
+  const geo = new THREE.BoxGeometry(0.12, 1, 0.12);
+  geo.translate(0, 0.5, 0); // grow from the base
+
+  const R = 3.35;
+  for (let i=0;i<FP.N;i++) {
+    const ang = (i/FP.N) * Math.PI * 2;
+    const col = cols.primary.clone().lerp(cols.accent, FP.amp[i]);
+    const mat = new THREE.MeshStandardMaterial({
+      color: col, emissive: col.clone(), emissiveIntensity: 0.6, metalness: 0.35, roughness: 0.35,
+    });
+    const bar = new THREE.Mesh(geo, mat);
+    bar.position.set(Math.cos(ang)*R, 0, Math.sin(ang)*R);
+    bar.scale.y = FP.amp[i] * 2.2;
+    group.add(bar);
+    FP.bars.push(bar);
+  }
+
+  // Atmospheric platen
+  const grid = new THREE.PolarGridHelper(R+0.5, 16, 6, 64, cols.primary, cols.accent);
+  grid.material.opacity = 0.10; grid.material.transparent = true;
+  scene.add(grid);
+
+  scene.add(new THREE.AmbientLight(0x5a5f8a, 0.7));
+  const p1 = new THREE.PointLight(cols.primary.getHex(), 1.3, 40); p1.position.set(0, 7, 4); scene.add(p1);
+  const p2 = new THREE.PointLight(cols.accent.getHex(), 0.9, 40); p2.position.set(-5, 2, -5); scene.add(p2);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 0.9, 0);
+  controls.enableDamping = true; controls.dampingFactor = 0.08;
+  controls.enablePan = false;
+  controls.enableZoom = true;              // wheel zoom when cursor is over the fingerprint; pinch on touch
+  controls.minDistance = 4.5; controls.maxDistance = 11; controls.zoomSpeed = 0.9;
+  controls.minPolarAngle = Math.PI*0.22; controls.maxPolarAngle = Math.PI*0.52;
+  controls.autoRotate = !REDUCED; controls.autoRotateSpeed = 0.55;
+  controls.update();
+
+  Object.assign(FP, { renderer, scene, camera, group, controls, clock: new THREE.Clock(), ok:true, p1, p2 });
+
+  window.addEventListener('resize', onResize3D);
+  animate3D();
+}
+
+function onResize3D() {
+  if (!FP.ok) return;
+  const wrap = document.getElementById('fp-canvas').parentElement;
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  FP.camera.aspect = W/H; FP.camera.updateProjectionMatrix();
+  FP.renderer.setSize(W, H, false);
+}
+
+function animate3D() {
+  if (!FP.ok) return;
+  const t = FP.clock.getElapsedTime();
+  FP.controls.update();
+  const env = player.active ? envAt(player.progress) : 0;
+  for (let i=0;i<FP.N;i++) {
+    const base = FP.amp[i];
+    let target;
+    if (player.active) {
+      target = base * (0.30 + 1.7*env) * (0.85 + 0.30*Math.sin(t*9 + i*0.5));
+    } else {
+      target = base * (0.8 + 0.18*Math.sin(t*1.6 + i*0.35));
+    }
+    if (REDUCED) target = base;
+    const bar = FP.bars[i];
+    const h = bar.scale.y + (target*2.2 - bar.scale.y) * 0.18;
+    bar.scale.y = h;
+    bar.material.emissiveIntensity = 0.45 + Math.min(1.6, (h/2.2)) * (player.playing ? 1.1 : 0.5);
+  }
+  FP.renderer.render(FP.scene, FP.camera);
+  requestAnimationFrame(animate3D);
+}
+
+function recolor3D() {
+  if (!FP.ok) return;
+  const cols = themeColors();
+  FP.bars.forEach((bar,i) => {
+    const col = cols.primary.clone().lerp(cols.accent, FP.amp[i]);
+    bar.material.color.copy(col); bar.material.emissive.copy(col);
+  });
+  FP.p1.color.set(cols.primary.getHex()); FP.p2.color.set(cols.accent.getHex());
+}
+
+function useFallback() {
+  document.getElementById('fp-canvas').style.display = 'none';
+  const fb = document.getElementById('fp-fallback');
+  fb.classList.remove('hidden'); fb.classList.add('grid');
+  fb.querySelector('#fp-fallback-bars').innerHTML = FP.amp.map((a,i) =>
+    `<span style="height:${Math.round(a*100)}%; width:5px; animation-delay:${(i%24)*55}ms"></span>`).join('');
+  lucide.createIcons();
+}
+
+/* ══════════════════════ STATES · TOAST · DEMO PANEL ══════════════════════ */
+function toast(msg, kind) {
+  const map = { success:'alert-success', error:'alert-error', info:'alert-info', warning:'alert-warning' };
+  const icon = { success:'badge-check', error:'triangle-alert', info:'info', warning:'triangle-alert' }[kind] || 'info';
+  const el = document.createElement('div');
+  el.className = `alert ${map[kind] || 'alert-info'} shadow-lg`;
+  el.innerHTML = `<i data-lucide="${icon}" class="w-5 h-5"></i><span>${msg}</span>`;
+  document.getElementById('toast-region').appendChild(el);
+  lucide.createIcons();
+  setTimeout(() => { el.style.transition='opacity .3s'; el.style.opacity='0'; setTimeout(()=>el.remove(),300); }, 3200);
+}
+function copyLink() { toast('Link copied to your clipboard.', 'success'); }
+function copyHash() { toast('Integrity hash copied.', 'success'); }
+
+function showLoading() {
+  closeDemo();
+  const ov = document.getElementById('ov-loading');
+  ov.querySelector('#loading-bars').innerHTML = Array.from({length:24},(_,i)=>
+    `<span style="height:${30+Math.round(envAt(i/24)*60)}%; animation-delay:${i*55}ms"></span>`).join('');
+  ov.classList.add('show');
+  setTimeout(() => ov.classList.remove('show'), 2400);
+}
+function showError() { closeDemo(); toast('We couldn’t load the recording. Check your connection and retry.', 'error'); }
+function showNotFound() { closeDemo(); document.getElementById('ov-notfound').classList.add('show'); }
+
+let overflowOn = false;
+function toggleOverflow() {
+  overflowOn = !overflowOn;
+  document.getElementById('signer-name').textContent = overflowOn
+    ? 'Jonathan Maximilian Bowen-Featherstonehaugh III'
+    : 'John Bowen';
+  document.getElementById('prop-line').textContent = overflowOn
+    ? 'Peacock Suites at the Anaheim Resort & Convention Gardens — Premium one-bedroom garden-view suite'
+    : 'Peacock Suites · one-bedroom suite';
+  closeDemo();
+  toast(overflowOn ? 'Showing long-content overflow.' : 'Restored default content.', 'info');
+}
+
+function resetView() {
+  document.querySelectorAll('.overlay').forEach(o => o.classList.remove('show'));
+  if (overflowOn) toggleOverflow();
+  player.active=false; player.playing=false; player.progress=0; player.idx=0; cancelAnimationFrame(player.raf); player.last=0;
+  SIG_CLIPS.forEach(c => { if (c.el) { c.el.pause(); c.el.currentTime = 0; } });
+  document.getElementById('sig-ladder').classList.remove('playing');
+  updateClip(); setPlayIcons('play');
+  const seal=document.getElementById('seal-badge'); seal.classList.add('invisible'); seal.classList.remove('seal-reveal');
+  closeDemo(); window.scrollTo({ top:0, behavior: REDUCED?'auto':'smooth' });
+}
+
+function toggleTheme() {
+  const h = document.documentElement;
+  h.dataset.theme = h.dataset.theme === 'brand-dark' ? 'brand' : 'brand-dark';
+  recolor3D();
+}
+
+function toggleDemo() { document.getElementById('demo-panel').classList.toggle('hidden'); }
+function closeDemo() { document.getElementById('demo-panel').classList.add('hidden'); }
+
+// Click-away to dismiss the not-found overlay
+document.getElementById('ov-notfound').addEventListener('click', e => {
+  if (e.target.id === 'ov-notfound') e.currentTarget.classList.remove('show');
+});
+
+/* ══════════════════════ BOOT ══════════════════════ */
+seedAmplitudes();
+renderClauses();
+renderTranscript();
+initAudio();
+updateClip();
+init3D();
+lucide.createIcons();
+</script>
+</body>
+</html>
