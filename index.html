@@ -211,7 +211,7 @@ h1,h2,h3,h4,.font-display { font-family: var(--font-display); font-optical-sizin
           </div>
 
           <!-- the spoken-signature player — continuous with the graphic -->
-          <div class="px-5 sm:px-7 pb-6 mt-4 flex flex-col gap-4">
+          <div class="px-5 sm:px-7 pb-2 mt-4 flex flex-col gap-4">
             <div class="flex items-center gap-4">
               <button id="play-btn" onclick="togglePlay()"
                 class="btn btn-primary btn-circle btn-lg shrink-0" aria-label="Play or pause the signature clip">
@@ -222,14 +222,16 @@ h1,h2,h3,h4,.font-display { font-family: var(--font-display); font-optical-sizin
                   <div class="font-display text-lg">The spoken signature</div>
                   <div class="mono text-sm text-base-content/55"><span id="cur-time">03:05</span> / 03:18</div>
                 </div>
-                <ul id="sig-ladder" class="steps steps-horizontal w-full mt-2 text-xs" aria-label="Verification progress">
-                  <li class="step step-success" data-step="0" data-content="✓">Identity</li>
-                  <li class="step step-success" data-step="1" data-content="✓">Terms</li>
-                  <li class="step step-success" data-step="2" data-content="✓">Name</li>
-                  <li class="step step-success" data-step="3" data-content="✓">Sealed</li>
-                </ul>
               </div>
             </div>
+
+            <!-- verification ladder — full width so it isn't cramped on mobile -->
+            <ul id="sig-ladder" class="steps steps-horizontal w-full text-[0.65rem] sm:text-xs" aria-label="Verification progress">
+              <li class="step step-success" data-step="0" data-content="✓">Identity</li>
+              <li class="step step-success" data-step="1" data-content="✓">Terms</li>
+              <li class="step step-success" data-step="2" data-content="✓">Name</li>
+              <li class="step step-success" data-step="3" data-content="✓">Sealed</li>
+            </ul>
 
             <!-- The exchange, smaller, under the ladder (corrected product wording) -->
             <div class="grid gap-1.5" id="sig-lines">
@@ -616,8 +618,9 @@ function init3D() {
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(45, W/H, 0.1, 100);
-  camera.position.set(0, 3.4, 7.4);
+  const MOBILE = window.matchMedia('(max-width: 640px)').matches;
+  const camera = new THREE.PerspectiveCamera(MOBILE ? 52 : 45, W/H, 0.1, 100);
+  camera.position.set(0, MOBILE ? 4.8 : 3.4, MOBILE ? 13.2 : 7.4);  // mobile: pull back so the whole ring fits
 
   const group = new THREE.Group();
   scene.add(group);
@@ -661,7 +664,7 @@ function init3D() {
   controls.enableDamping = true; controls.dampingFactor = 0.08;
   controls.enablePan = false;
   controls.enableZoom = true;              // wheel zoom when cursor is over the fingerprint; pinch on touch
-  controls.minDistance = 4.5; controls.maxDistance = 11; controls.zoomSpeed = 0.9;
+  controls.minDistance = 4.5; controls.maxDistance = MOBILE ? 16 : 11; controls.zoomSpeed = 0.9;
   controls.minPolarAngle = Math.PI*0.22; controls.maxPolarAngle = Math.PI*0.52;
   controls.autoRotate = !REDUCED; controls.autoRotateSpeed = 0.32;
   controls.update();
