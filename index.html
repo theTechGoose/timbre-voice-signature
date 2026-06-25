@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="brand-dark">
+<html lang="en" data-theme="brand">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -20,31 +20,31 @@
 
 [data-theme="brand"] {
   color-scheme: light;
-  --color-base-100: #f7f8fc; --color-base-200: #eef0f8; --color-base-300: #dcdfee;
-  --color-base-content: #161a2e;
-  --color-primary: #5546e6; --color-primary-content: #ffffff;
-  --color-secondary: #8b7bf7; --color-secondary-content: #181433;
-  --color-accent: #0fa6b8; --color-accent-content: #04282d;
-  --color-neutral: #1e2236; --color-neutral-content: #e9ebf5;
-  --color-info: #3b82f6; --color-info-content: #ffffff;
-  --color-success: #16b981; --color-success-content: #04231a;
-  --color-warning: #e0a106; --color-warning-content: #2a1d00;
-  --color-error: #f43f5e; --color-error-content: #ffffff;
+  --color-base-100: #fbf8f0; --color-base-200: #f2ead8; --color-base-300: #ddd0b3;
+  --color-base-content: #28382c;
+  --color-primary: #4c8340; --color-primary-content: #ffffff;
+  --color-secondary: #e2a341; --color-secondary-content: #2a1d00;
+  --color-accent: #0ea7b8; --color-accent-content: #ffffff;
+  --color-neutral: #26352b; --color-neutral-content: #f2ead8;
+  --color-info: #2f9bd6; --color-info-content: #ffffff;
+  --color-success: #4f9a45; --color-success-content: #ffffff;
+  --color-warning: #d9912a; --color-warning-content: #2a1d00;
+  --color-error: #e0604e; --color-error-content: #ffffff;
   --radius-selector: 2rem; --radius-field: 0.5rem; --radius-box: 1rem;
   --size-selector: 0.25rem; --size-field: 0.25rem; --border: 1px; --depth: 1; --noise: 0;
 }
 [data-theme="brand-dark"] {
   color-scheme: dark;
-  --color-base-100: #0c0e1a; --color-base-200: #14172a; --color-base-300: #262c49;
-  --color-base-content: #e7e9f6;
-  --color-primary: #8b7bff; --color-primary-content: #0b0a22;
-  --color-secondary: #b9afff; --color-secondary-content: #181433;
+  --color-base-100: #0c1714; --color-base-200: #122420; --color-base-300: #213b33;
+  --color-base-content: #e8f1e6;
+  --color-primary: #74c45f; --color-primary-content: #07210a;
+  --color-secondary: #f0c069; --color-secondary-content: #2a1d00;
   --color-accent: #2dd4e6; --color-accent-content: #042a30;
-  --color-neutral: #1b1f33; --color-neutral-content: #dfe3f2;
-  --color-info: #5c9dff; --color-info-content: #03122b;
-  --color-success: #34d89e; --color-success-content: #04231a;
+  --color-neutral: #16261f; --color-neutral-content: #dfeede;
+  --color-info: #5cc0ff; --color-info-content: #03122b;
+  --color-success: #57c46a; --color-success-content: #04231a;
   --color-warning: #f5c84b; --color-warning-content: #2a1d00;
-  --color-error: #fb6f87; --color-error-content: #2a0410;
+  --color-error: #fb7d6b; --color-error-content: #2a0410;
   --radius-selector: 2rem; --radius-field: 0.5rem; --radius-box: 1rem;
   --size-selector: 0.25rem; --size-field: 0.25rem; --border: 1px; --depth: 1; --noise: 0;
 }
@@ -74,6 +74,10 @@ h1,h2,h3,h4,.font-display { font-family: var(--font-display); font-optical-sizin
 <style>
   .rise { animation: brand-rise .6s var(--ease-standard) both; }
   .mono { font-family: var(--font-mono); }
+
+  /* Beachy backdrop — sea-foam fading to warm sand (light) / deep ocean (dark) */
+  [data-theme="brand"] body { background: linear-gradient(180deg, #d8efe8 0%, #edf6ee 15%, var(--color-base-100) 44%) fixed no-repeat; }
+  [data-theme="brand-dark"] body { background: linear-gradient(180deg, #0e2027 0%, var(--color-base-100) 42%) fixed no-repeat; }
 
   /* The 3D stage + its atmospheric glow */
   #record { position: relative; isolation: isolate; }
@@ -631,8 +635,8 @@ function seedAmplitudes() {
 function themeColors() {
   const cs = getComputedStyle(document.documentElement);
   return {
-    primary: new THREE.Color(cs.getPropertyValue('--color-primary').trim() || '#8b7bff'),
-    accent:  new THREE.Color(cs.getPropertyValue('--color-accent').trim()  || '#2dd4e6'),
+    primary: new THREE.Color(cs.getPropertyValue('--color-primary').trim() || '#4c8340'),
+    accent:  new THREE.Color(cs.getPropertyValue('--color-accent').trim()  || '#0ea7b8'),
   };
 }
 
