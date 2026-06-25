@@ -218,9 +218,9 @@ h1,h2,h3,h4,.font-display { font-family: var(--font-display); font-optical-sizin
                 <i data-lucide="play" class="w-6 h-6 translate-x-0.5"></i>
               </button>
               <div class="min-w-0 flex-1">
-                <div class="flex items-center justify-between gap-3">
-                  <div class="font-display text-lg">The spoken signature</div>
-                  <div class="mono text-sm text-base-content/55"><span id="cur-time">03:05</span> / 03:18</div>
+                <div class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-x-3">
+                  <div class="font-display text-lg leading-tight">The spoken signature</div>
+                  <div class="mono text-sm text-base-content/55 shrink-0 whitespace-nowrap"><span id="cur-time">03:05</span> / 03:18</div>
                 </div>
               </div>
             </div>
@@ -250,7 +250,7 @@ h1,h2,h3,h4,.font-display { font-family: var(--font-display); font-optical-sizin
             </div>
 
             <div class="flex items-center justify-between flex-wrap gap-2">
-              <span id="seal-badge" class="badge badge-success gap-1.5 invisible">
+              <span id="seal-badge" class="badge badge-success gap-1.5 hidden">
                 <i data-lucide="badge-check" class="w-4 h-4"></i> Signature sealed
               </span>
               <span class="text-xs text-base-content/45 flex items-center gap-1.5">
@@ -576,7 +576,7 @@ function endClip() {
   document.getElementById('sig-ladder').classList.remove('playing');
   // Reveal the seal with the brand bounce
   const seal = document.getElementById('seal-badge');
-  seal.classList.remove('invisible'); seal.classList.add('seal-reveal');
+  seal.classList.remove('hidden'); seal.classList.add('seal-reveal');
   toast('Signature sealed — this agreement is binding.', 'success');
 }
 
